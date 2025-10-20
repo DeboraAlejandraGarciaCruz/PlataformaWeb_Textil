@@ -118,3 +118,111 @@ export default function ProductDetailPage() {
     </div>
   );
 }
+
+
+
+import { createContext, useContext, useState, useCallback } from 'react';
+import { apiFetch } from '../utils/api';
+
+const ProductContext = createContext();
+
+export function ProductProvider({ children }) {
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // 🔹 Obtener todos los productos (siempre desde el backend)
+  const fetchProducts = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const data = await apiFetch('/api/products');
+      if (Array.isArray(data)) {
+        setProducts(data);
+      } else {
+        console.warn('Respuesta inesperada del servidor:', data);
+      }
+    } catch (err) {
+      console.error('❌ Error al obtener productos:', err);
+      setError('No se pudieron cargar los productos.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // 🔹 Crear producto
+  const createProduct = async (formData) => {
+    try {
+      await apiFetch('/api/products', {
+        method: 'POST',
+        body: formData,
+      });
+      await fetchProducts(); // 🔁 refrescar lista
+    } catch (err) {
+      console.error('❌ Error al crear producto:', err);
+      throw err;
+    }
+  };
+
+  // 🔹 Actualizar producto
+  const updateProduct = async (id, formData) => {
+    try {
+      await apiFetch(`/api/products/${id}`, {
+        method: 'PUT',
+        body: formData,
+      });
+      await fetchProducts(); // 🔁 refrescar lista con datos nuevos
+    } catch (err) {
+      console.error('❌ Error al actualizar producto:', err);
+      throw err;
+    }
+  };
+
+  // 🔹 Eliminar producto
+  const deleteProduct = async (id) => {
+    try {
+      await apiFetch(`/api/products/${id}`, {
+        method: 'DELETE',
+      });
+      await fetchProducts(); // 🔁 actualizar lista sin el producto eliminado
+    } catch (err) {
+      console.error('❌ Error al eliminar producto:', err);
+      throw err;
+    }
+  };
+
+  // 🔹 Eliminar una imagen específica del producto
+  const deleteImageFromProduct = async (productId, imageUrl) => {
+    try {
+      await apiFetch(`/api/products/${productId}/images`, {
+        method: 'DELETE',
+        body: JSON.stringify({ imageUrl }),
+      });
+      await fetchProducts(); // 🔁 refrescar después de eliminar la imagen
+    } catch (err) {
+      console.error('❌ Error al eliminar imagen del producto:', err);
+      throw err;
+    }
+  };
+
+  return (
+    <ProductContext.Provider
+      value={{
+        products,
+        loading,
+        error,
+        fetchProducts,
+        createProduct,
+        updateProduct,
+        deleteProduct,
+        deleteImageFromProduct,
+      }}
+    >
+      {children}
+    </ProductContext.Provider>
+  );
+}
+
+export const useProducts = () => useContext(ProductContext);
+
